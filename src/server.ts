@@ -18,12 +18,15 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 
 app.use(helmet());
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-    credentials: true,
-  }),
-);
+const corsOriginEnv = process.env.CORS_ORIGIN;
+const corsOptions: cors.CorsOptions = {
+  origin:
+    process.env.NODE_ENV === 'development'
+      ? /^http:\/\/localhost:\d+$/
+      : corsOriginEnv?.split(',') || 'http://localhost:3000',
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 
 if (process.env.NODE_ENV !== 'production') {
