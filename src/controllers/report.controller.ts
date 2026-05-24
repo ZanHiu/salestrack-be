@@ -58,7 +58,7 @@ export async function exportExcel(
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="salestrack-${year}.xlsx"`,
+      `attachment; filename="KQBH_${year}.xlsx"`,
     );
     res.status(200).send(buffer);
   } catch (err) {
