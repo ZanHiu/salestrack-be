@@ -37,13 +37,20 @@ export async function exportExcel(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { year, type } = exportQuerySchema.parse(req.query);
-    const report =
-      type === 'by-product'
-        ? await reportService.byProduct(year)
-        : await reportService.byCustomer(year);
+    const { year } = exportQuerySchema.parse(req.query);
 
-    const buffer = buildReportWorkbook(report, type);
+    const [customerReport, productReport, rawExport] = await Promise.all([
+      reportService.byCustomer(year),
+      reportService.byProduct(year),
+      reportService.getRawExportData(year),
+    ]);
+
+    const buffer = await buildReportWorkbook({
+      year,
+      customerReport,
+      productReport,
+      rawExport,
+    });
 
     res.setHeader(
       'Content-Type',
@@ -51,7 +58,7 @@ export async function exportExcel(
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="baocao-${year}-${type}.xlsx"`,
+      `attachment; filename="salestrack-${year}.xlsx"`,
     );
     res.status(200).send(buffer);
   } catch (err) {
