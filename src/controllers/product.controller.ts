@@ -29,6 +29,59 @@ export async function listCategories(
   }
 }
 
+export async function renameCategory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { oldName, newName, newOrder } = req.body as {
+      oldName: string;
+      newName: string;
+      newOrder: number;
+    };
+    if (!oldName || typeof oldName !== 'string') {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'oldName là bắt buộc' } });
+      return;
+    }
+    if (!newName || typeof newName !== 'string') {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'newName là bắt buộc' } });
+      return;
+    }
+    const orderNum = Number(newOrder);
+    if (!Number.isInteger(orderNum) || orderNum < 1 || orderNum > 99) {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'newOrder phải là số nguyên 1-99' } });
+      return;
+    }
+    const result = await productService.renameCategory(oldName, newName, orderNum);
+    res.status(200).json({ data: result });
+  } catch (err) {
+    if (err instanceof Error) {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: err.message } });
+      return;
+    }
+    next(err);
+  }
+}
+
+export async function deleteCategory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const name = decodeURIComponent(req.params.name);
+    const result = await productService.deleteCategory(name);
+    res.status(200).json({ data: result });
+  } catch (err) {
+    if (err instanceof Error) {
+      res.status(409).json({ error: { code: 'HAS_REFERENCES', message: err.message } });
+      return;
+    }
+    next(err);
+  }
+}
+
 export async function getById(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const product = await productService.getById(req.params.id);

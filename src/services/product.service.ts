@@ -69,6 +69,37 @@ export async function remove(id: string): Promise<{ softDeleted: boolean }> {
   return { softDeleted: false };
 }
 
+export async function renameCategory(
+  oldName: string,
+  newName: string,
+  newOrder: number,
+): Promise<{ updated: number }> {
+  const trimmedNew = newName.trim();
+  if (!trimmedNew) {
+    throw new Error('Tên nhóm mới không được rỗng');
+  }
+  if (oldName !== trimmedNew) {
+    const conflict = await Product.exists({ categoryName: trimmedNew });
+    if (conflict) {
+      throw new Error('Nhóm với tên này đã tồn tại');
+    }
+  }
+  const result = await Product.updateMany(
+    { categoryName: oldName },
+    { $set: { categoryName: trimmedNew, categoryOrder: newOrder } },
+  );
+  return { updated: result.modifiedCount };
+}
+
+export async function deleteCategory(name: string): Promise<{ deleted: number }> {
+  const count = await Product.countDocuments({ categoryName: name });
+  if (count > 0) {
+    throw new Error(`Nhóm còn ${count} sản phẩm. Xóa sản phẩm trước khi xóa nhóm.`);
+  }
+  // Categories are derived from products → empty category is already "deleted".
+  return { deleted: 0 };
+}
+
 export async function listCategories(): Promise<CategorySummary[]> {
   const result = await Product.aggregate<{
     _id: { order: number; name: string };
