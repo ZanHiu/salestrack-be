@@ -14,13 +14,15 @@ export function calculateActualAmount(input: {
   quantity?: number;
   unitPrice?: number;
 }): number {
-  if (input.manualActual !== undefined && input.manualActual > 0) {
+  // Manual value (including 0) is explicit user intent — always wins.
+  // Only auto-calculate from qty*price when manualActual is not provided.
+  if (input.manualActual !== undefined) {
     return input.manualActual;
   }
   if (input.quantity && input.unitPrice) {
     return Math.round((input.quantity * input.unitPrice) / 1_000_000 * 100) / 100;
   }
-  return input.manualActual ?? 0;
+  return 0;
 }
 
 export async function list(query: ListEntriesQuery) {
@@ -81,21 +83,60 @@ export async function upsert(dto: UpsertEntryDto, userId: string): Promise<ISale
   if (!customer) throw notFound('Khong tim thay khach hang');
   if (!product) throw notFound('Khong tim thay san pham');
 
-  const finalActual = calculateActualAmount({
-    manualActual: dto.actualAmount,
-    quantity: dto.quantity,
-    unitPrice: dto.unitPrice,
+  // Load existing to merge with partial update (so we don't overwrite untouched fields).
+  const existing = await SalesEntry.findOne({
+    year: dto.year,
+    month: dto.month,
+    customerId: dto.customerId,
+    productId: dto.productId,
   });
 
   const update: Record<string, unknown> = {
-    planAmount: dto.planAmount ?? 0,
-    actualAmount: finalActual,
     updatedBy: userId,
   };
 
+  // Defaults only when CREATING a new entry; otherwise leave untouched fields alone.
+  if (!existing) {
+    update.planAmount = 0;
+    update.actualAmount = 0;
+  }
+
+  // Only set planAmount if explicitly provided.
+  if (dto.planAmount !== undefined) {
+    update.planAmount = dto.planAmount;
+  }
+
+  // unitPrice / quantity / note: explicit set only.
   if (dto.unitPrice !== undefined) update.unitPrice = dto.unitPrice;
   if (dto.quantity !== undefined) update.quantity = dto.quantity;
   if (dto.note !== undefined) update.note = dto.note;
+
+  // Recalculate actualAmount only if user touched any of: actualAmount, quantity, unitPrice.
+  // Merge with existing quantity/unitPrice so partial updates work (e.g. user changes only qty).
+  const touchesActual =
+    dto.actualAmount !== undefined ||
+    dto.quantity !== undefined ||
+    dto.unitPrice !== undefined;
+  if (touchesActual) {
+    update.actualAmount = calculateActualAmount({
+      manualActual: dto.actualAmount,
+      quantity: dto.quantity ?? existing?.quantity,
+      unitPrice: dto.unitPrice ?? existing?.unitPrice,
+    });
+  }
+
+  // Inline edit on the cell sends actualAmount alone (no qty/price). Treat as switching
+  // into "manual mode" for this cell: clear stale qty/unitPrice so detail modal stays
+  // consistent with the displayed value.
+  const isInlineActualEdit =
+    dto.actualAmount !== undefined &&
+    dto.quantity === undefined &&
+    dto.unitPrice === undefined;
+
+  const updateOps: Record<string, unknown> = { $set: update };
+  if (isInlineActualEdit && existing) {
+    updateOps.$unset = { quantity: 1, unitPrice: 1 };
+  }
 
   const entry = await SalesEntry.findOneAndUpdate(
     {
@@ -104,7 +145,7 @@ export async function upsert(dto: UpsertEntryDto, userId: string): Promise<ISale
       customerId: dto.customerId,
       productId: dto.productId,
     },
-    { $set: update },
+    updateOps,
     { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
   );
 
