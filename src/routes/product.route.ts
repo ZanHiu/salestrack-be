@@ -4,6 +4,8 @@ import * as productController from '../controllers/product.controller';
 const router = Router();
 
 router.get('/categories', productController.listCategories);
+router.patch('/categories/rename', productController.renameCategory);
+router.delete('/categories/:name', productController.deleteCategory);
 router.get('/', productController.list);
 router.get('/:id', productController.getById);
 router.post('/', productController.create);
