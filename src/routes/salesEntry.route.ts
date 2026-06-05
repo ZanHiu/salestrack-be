@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import * as salesEntryController from '../controllers/salesEntry.controller';
+import { requireAdmin } from '../middlewares/requireAdmin';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -11,7 +12,12 @@ const router = Router();
 
 router.get('/', salesEntryController.list);
 router.post('/', salesEntryController.upsert);
-router.post('/bulk-import', upload.single('file'), salesEntryController.bulkImport);
+router.post(
+  '/bulk-import',
+  requireAdmin,
+  upload.single('file'),
+  salesEntryController.bulkImport,
+);
 router.patch('/:id', salesEntryController.update);
 router.delete('/:id', salesEntryController.remove);
 
