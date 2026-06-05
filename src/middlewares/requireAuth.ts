@@ -29,7 +29,13 @@ export async function requireAuth(
 
     if (!user) {
       res.status(401).json({
-        error: { code: ERROR_CODES.UNAUTHORIZED, message: 'User khong ton tai' },
+        error: { code: ERROR_CODES.UNAUTHORIZED, message: 'User không tồn tại' },
+      });
+      return;
+    }
+    if (!user.isActive) {
+      res.status(401).json({
+        error: { code: ERROR_CODES.UNAUTHORIZED, message: 'Tài khoản đã bị vô hiệu hóa' },
       });
       return;
     }
