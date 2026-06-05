@@ -3,6 +3,8 @@ import { SalesEntry, ISalesEntry } from '../models/SalesEntry';
 import { Customer } from '../models/Customer';
 import { Product } from '../models/Product';
 import { notFound } from '../utils/errors';
+import * as audit from './audit.service';
+import { diff } from './audit.service';
 import type {
   UpsertEntryDto,
   UpdateEntryDto,
@@ -149,6 +151,50 @@ export async function upsert(dto: UpsertEntryDto, userId: string): Promise<ISale
     { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
   );
 
+  const label = `${customer.name} · ${product.name} · T${dto.month}/${dto.year}`;
+  if (!existing) {
+    await audit.record({
+      userId,
+      action: 'create',
+      resource: 'sales-entry',
+      resourceId: entry._id.toString(),
+      resourceLabel: label,
+      changes: [
+        { field: 'planAmount', after: entry.planAmount },
+        { field: 'actualAmount', after: entry.actualAmount },
+        ...(entry.quantity !== undefined ? [{ field: 'quantity', after: entry.quantity }] : []),
+        ...(entry.unitPrice !== undefined ? [{ field: 'unitPrice', after: entry.unitPrice }] : []),
+      ],
+    });
+  } else {
+    const changes = diff(
+      {
+        planAmount: existing.planAmount,
+        actualAmount: existing.actualAmount,
+        quantity: existing.quantity,
+        unitPrice: existing.unitPrice,
+        note: existing.note,
+      },
+      {
+        planAmount: entry.planAmount,
+        actualAmount: entry.actualAmount,
+        quantity: entry.quantity,
+        unitPrice: entry.unitPrice,
+        note: entry.note,
+      },
+    );
+    if (changes.length > 0) {
+      await audit.record({
+        userId,
+        action: 'update',
+        resource: 'sales-entry',
+        resourceId: entry._id.toString(),
+        resourceLabel: label,
+        changes,
+      });
+    }
+  }
+
   return entry;
 }
 
@@ -158,7 +204,7 @@ export async function update(
   userId: string,
 ): Promise<ISalesEntry> {
   const existing = await SalesEntry.findById(id);
-  if (!existing) throw notFound('Khong tim thay entry');
+  if (!existing) throw notFound('Không tìm thấy entry');
 
   if (
     dto.quantity !== undefined ||
@@ -180,11 +226,63 @@ export async function update(
     { $set: { ...dto, updatedBy: userId } },
     { new: true, runValidators: true },
   );
-  if (!entry) throw notFound('Khong tim thay entry');
+  if (!entry) throw notFound('Không tìm thấy entry');
+
+  const changes = diff(
+    {
+      planAmount: existing.planAmount,
+      actualAmount: existing.actualAmount,
+      quantity: existing.quantity,
+      unitPrice: existing.unitPrice,
+      note: existing.note,
+    },
+    {
+      planAmount: entry.planAmount,
+      actualAmount: entry.actualAmount,
+      quantity: entry.quantity,
+      unitPrice: entry.unitPrice,
+      note: entry.note,
+    },
+  );
+  if (changes.length > 0) {
+    const [customer, product] = await Promise.all([
+      Customer.findById(entry.customerId).select('name').lean(),
+      Product.findById(entry.productId).select('name').lean(),
+    ]);
+    const label = `${customer?.name ?? '?'} · ${product?.name ?? '?'} · T${entry.month}/${entry.year}`;
+    await audit.record({
+      userId,
+      action: 'update',
+      resource: 'sales-entry',
+      resourceId: entry._id.toString(),
+      resourceLabel: label,
+      changes,
+    });
+  }
+
   return entry;
 }
 
-export async function remove(id: string): Promise<void> {
-  const entry = await SalesEntry.findByIdAndDelete(id);
-  if (!entry) throw notFound('Khong tim thay entry');
+export async function remove(id: string, userId: string): Promise<void> {
+  const entry = await SalesEntry.findById(id);
+  if (!entry) throw notFound('Không tìm thấy entry');
+
+  const [customer, product] = await Promise.all([
+    Customer.findById(entry.customerId).select('name').lean(),
+    Product.findById(entry.productId).select('name').lean(),
+  ]);
+  const label = `${customer?.name ?? '?'} · ${product?.name ?? '?'} · T${entry.month}/${entry.year}`;
+
+  await SalesEntry.findByIdAndDelete(id);
+  await audit.record({
+    userId,
+    action: 'delete',
+    resource: 'sales-entry',
+    resourceId: id,
+    resourceLabel: label,
+    changes: [
+      { field: 'planAmount', before: entry.planAmount },
+      { field: 'actualAmount', before: entry.actualAmount },
+    ],
+  });
 }
