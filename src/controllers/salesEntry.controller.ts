@@ -42,7 +42,8 @@ export async function update(req: Request, res: Response, next: NextFunction): P
 
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await salesEntryService.remove(req.params.id);
+    if (!req.user) throw unauthorized();
+    await salesEntryService.remove(req.params.id, req.user.id);
     res.status(204).end();
   } catch (err) {
     next(err);

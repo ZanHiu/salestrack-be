@@ -5,6 +5,7 @@ import {
   updateProductSchema,
   listProductsQuerySchema,
 } from '../schemas/product.schema';
+import { unauthorized } from '../utils/errors';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -53,7 +54,8 @@ export async function renameCategory(
       res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'newOrder phải là số nguyên 1-99' } });
       return;
     }
-    const result = await productService.renameCategory(oldName, newName, orderNum);
+    if (!req.user) throw unauthorized();
+    const result = await productService.renameCategory(oldName, newName, orderNum, req.user.id);
     res.status(200).json({ data: result });
   } catch (err) {
     if (err instanceof Error) {
@@ -70,8 +72,9 @@ export async function deleteCategory(
   next: NextFunction,
 ): Promise<void> {
   try {
+    if (!req.user) throw unauthorized();
     const name = decodeURIComponent(req.params.name);
-    const result = await productService.deleteCategory(name);
+    const result = await productService.deleteCategory(name, req.user.id);
     res.status(200).json({ data: result });
   } catch (err) {
     if (err instanceof Error) {
@@ -93,8 +96,9 @@ export async function getById(req: Request, res: Response, next: NextFunction): 
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    if (!req.user) throw unauthorized();
     const dto = createProductSchema.parse(req.body);
-    const product = await productService.create(dto);
+    const product = await productService.create(dto, req.user.id);
     res.status(201).json({ data: product });
   } catch (err) {
     next(err);
@@ -103,8 +107,9 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    if (!req.user) throw unauthorized();
     const dto = updateProductSchema.parse(req.body);
-    const product = await productService.update(req.params.id, dto);
+    const product = await productService.update(req.params.id, dto, req.user.id);
     res.status(200).json({ data: product });
   } catch (err) {
     next(err);
@@ -113,7 +118,8 @@ export async function update(req: Request, res: Response, next: NextFunction): P
 
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await productService.remove(req.params.id);
+    if (!req.user) throw unauthorized();
+    const result = await productService.remove(req.params.id, req.user.id);
     if (result.softDeleted) {
       res.status(200).json({ data: { softDeleted: true } });
     } else {

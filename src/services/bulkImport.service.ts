@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { Customer } from '../models/Customer';
 import { Product } from '../models/Product';
 import { SalesEntry } from '../models/SalesEntry';
+import * as audit from './audit.service';
 
 export interface ImportError {
   row: number;
@@ -162,6 +163,19 @@ export async function importFromBuffer(
       }
     }
   }
+
+  await audit.record({
+    userId,
+    action: 'bulk_import',
+    resource: 'sales-entry',
+    resourceLabel: `Năm ${year}`,
+    metadata: {
+      year,
+      imported,
+      failed: errors.length,
+      fileSize: buffer.length,
+    },
+  });
 
   return { imported, failed: errors.length, errors };
 }
