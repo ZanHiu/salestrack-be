@@ -2,7 +2,12 @@ import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { User, IUser } from '../models/User';
 import { unauthorized, validationError } from '../utils/errors';
-import type { LoginDto, ChangePasswordDto } from '../schemas/auth.schema';
+import * as audit from './audit.service';
+import type {
+  LoginDto,
+  ChangePasswordDto,
+  UpdateProfileDto,
+} from '../schemas/auth.schema';
 
 interface LoginResult {
   token: string;
@@ -25,15 +30,46 @@ function signToken(user: IUser): string {
 export async function login(dto: LoginDto): Promise<LoginResult> {
   const user = await User.findOne({ username: dto.username.toLowerCase() });
   if (!user) {
-    throw unauthorized('Tai khoan hoac mat khau khong dung');
+    await audit.record({
+      action: 'login_failed',
+      resource: 'auth',
+      userFullNameOverride: dto.username,
+      metadata: { reason: 'unknown_user' },
+    });
+    throw unauthorized('Tài khoản hoặc mật khẩu không đúng');
   }
 
   const ok = await bcrypt.compare(dto.password, user.passwordHash);
   if (!ok) {
-    throw unauthorized('Tai khoan hoac mat khau khong dung');
+    await audit.record({
+      action: 'login_failed',
+      resource: 'auth',
+      userId: user._id.toString(),
+      userFullNameOverride: user.fullName,
+      userRoleOverride: user.role,
+      metadata: { reason: 'wrong_password' },
+    });
+    throw unauthorized('Tài khoản hoặc mật khẩu không đúng');
+  }
+
+  if (!user.isActive) {
+    await audit.record({
+      action: 'login_failed',
+      resource: 'auth',
+      userId: user._id.toString(),
+      userFullNameOverride: user.fullName,
+      userRoleOverride: user.role,
+      metadata: { reason: 'inactive' },
+    });
+    throw unauthorized('Tài khoản đã bị vô hiệu hóa');
   }
 
   const token = signToken(user);
+  await audit.record({
+    action: 'login',
+    resource: 'auth',
+    userId: user._id.toString(),
+  });
   return {
     token,
     user: {
@@ -56,4 +92,33 @@ export async function changePassword(userId: string, dto: ChangePasswordDto): Pr
 
   user.passwordHash = await bcrypt.hash(dto.newPassword, 10);
   await user.save();
+  await audit.record({
+    action: 'password_change',
+    resource: 'auth',
+    userId,
+  });
+}
+
+export async function updateProfile(userId: string, dto: UpdateProfileDto): Promise<IUser> {
+  const existing = await User.findById(userId);
+  if (!existing) throw unauthorized('User không tồn tại');
+  const oldFullName = existing.fullName;
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { fullName: dto.fullName },
+    { new: true, runValidators: true },
+  );
+  if (!user) throw unauthorized('User không tồn tại');
+
+  if (oldFullName !== dto.fullName) {
+    await audit.record({
+      action: 'profile_update',
+      resource: 'auth',
+      userId,
+      changes: [{ field: 'fullName', before: oldFullName, after: dto.fullName }],
+    });
+  }
+
+  return user;
 }

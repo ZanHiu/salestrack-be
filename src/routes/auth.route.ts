@@ -23,5 +23,6 @@ router.post('/login', authRateLimit, authController.login);
 router.post('/logout', requireAuth, authController.logout);
 router.get('/me', requireAuth, authController.me);
 router.patch('/password', requireAuth, authController.changePassword);
+router.patch('/profile', requireAuth, authController.updateProfile);
 
 export default router;
