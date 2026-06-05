@@ -8,6 +8,8 @@ import morgan from 'morgan';
 import { connectDB } from './config/db';
 import authRouter from './routes/auth.route';
 import customerRouter from './routes/customer.route';
+import userRouter from './routes/user.route';
+import auditRouter from './routes/audit.route';
 import productRouter from './routes/product.route';
 import salesEntryRouter from './routes/salesEntry.route';
 import reportRouter from './routes/report.route';
@@ -43,6 +45,8 @@ app.get('/api/health', (_req: Request, res: Response) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/customers', requireAuth, customerRouter);
+app.use('/api/users', requireAuth, userRouter);
+app.use('/api/audit', requireAuth, auditRouter);
 app.use('/api/products', requireAuth, productRouter);
 app.use('/api/sales-entries', requireAuth, salesEntryRouter);
 app.use('/api/reports', requireAuth, reportRouter);
