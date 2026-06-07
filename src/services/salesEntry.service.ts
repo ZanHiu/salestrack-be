@@ -152,6 +152,12 @@ export async function upsert(dto: UpsertEntryDto, userId: string): Promise<ISale
   );
 
   const label = `${customer.name} · ${product.name} · T${dto.month}/${dto.year}`;
+  const entryMeta = {
+    year: dto.year,
+    month: dto.month,
+    customerId: dto.customerId,
+    productId: dto.productId,
+  };
   if (!existing) {
     await audit.record({
       userId,
@@ -159,6 +165,7 @@ export async function upsert(dto: UpsertEntryDto, userId: string): Promise<ISale
       resource: 'sales-entry',
       resourceId: entry._id.toString(),
       resourceLabel: label,
+      metadata: entryMeta,
       changes: [
         { field: 'planAmount', after: entry.planAmount },
         { field: 'actualAmount', after: entry.actualAmount },
@@ -190,6 +197,7 @@ export async function upsert(dto: UpsertEntryDto, userId: string): Promise<ISale
         resource: 'sales-entry',
         resourceId: entry._id.toString(),
         resourceLabel: label,
+        metadata: entryMeta,
         changes,
       });
     }
@@ -256,6 +264,12 @@ export async function update(
       resource: 'sales-entry',
       resourceId: entry._id.toString(),
       resourceLabel: label,
+      metadata: {
+        year: entry.year,
+        month: entry.month,
+        customerId: entry.customerId.toString(),
+        productId: entry.productId.toString(),
+      },
       changes,
     });
   }
@@ -280,6 +294,12 @@ export async function remove(id: string, userId: string): Promise<void> {
     resource: 'sales-entry',
     resourceId: id,
     resourceLabel: label,
+    metadata: {
+      year: entry.year,
+      month: entry.month,
+      customerId: entry.customerId.toString(),
+      productId: entry.productId.toString(),
+    },
     changes: [
       { field: 'planAmount', before: entry.planAmount },
       { field: 'actualAmount', before: entry.actualAmount },
