@@ -1,4 +1,23 @@
+import dns from 'node:dns';
 import mongoose from 'mongoose';
+
+function configureMongoDns(): void {
+  const configuredServers = process.env.MONGODB_DNS_SERVERS
+    ?.split(',')
+    .map((server) => server.trim())
+    .filter(Boolean);
+
+  const servers =
+    configuredServers && configuredServers.length > 0
+      ? configuredServers
+      : process.env.NODE_ENV === 'development'
+        ? ['8.8.8.8', '1.1.1.1']
+        : [];
+
+  if (servers.length > 0) {
+    dns.setServers(servers);
+  }
+}
 
 export async function connectDB(): Promise<void> {
   const uri = process.env.MONGODB_URI;
@@ -7,6 +26,7 @@ export async function connectDB(): Promise<void> {
   }
 
   try {
+    configureMongoDns();
     await mongoose.connect(uri);
     console.log('✓ Connected to MongoDB');
   } catch (err) {

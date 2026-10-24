@@ -5,6 +5,7 @@ export const createProductSchema = z.object({
   categoryName: z.string().trim().min(1).max(100),
   categoryOrder: z.number().int().min(1).max(99),
   unit: z.string().trim().max(20).optional(),
+  unitPrice: z.number().positive().max(1_000_000_000).optional(),
 });
 
 export const updateProductSchema = z.object({
@@ -12,6 +13,7 @@ export const updateProductSchema = z.object({
   categoryName: z.string().trim().min(1).max(100).optional(),
   categoryOrder: z.number().int().min(1).max(99).optional(),
   unit: z.string().trim().max(20).optional(),
+  unitPrice: z.number().positive().max(1_000_000_000).optional(),
   isActive: z.boolean().optional(),
 });
 
