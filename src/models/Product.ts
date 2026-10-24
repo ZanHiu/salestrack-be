@@ -6,6 +6,7 @@ export interface IProduct extends Document {
   categoryName: string;
   categoryOrder: number;
   unit?: string;
+  unitPrice?: number;
   isActive: boolean;
   createdAt: Date;
 }
@@ -35,6 +36,11 @@ const productSchema = new Schema<IProduct>(
       type: String,
       trim: true,
       maxlength: 20,
+    },
+    unitPrice: {
+      type: Number,
+      min: 0,
+      max: 1_000_000_000,
     },
     isActive: {
       type: Boolean,

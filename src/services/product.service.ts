@@ -58,6 +58,7 @@ export async function create(dto: CreateProductDto, actorId: string): Promise<IP
       { field: 'categoryName', after: product.categoryName },
       { field: 'categoryOrder', after: product.categoryOrder },
       ...(product.unit ? [{ field: 'unit', after: product.unit }] : []),
+      ...(product.unitPrice ? [{ field: 'unitPrice', after: product.unitPrice }] : []),
     ],
   });
   return product;
@@ -83,6 +84,7 @@ export async function update(
       categoryName: before.categoryName,
       categoryOrder: before.categoryOrder,
       unit: before.unit,
+      unitPrice: before.unitPrice,
       isActive: before.isActive,
     },
     {
@@ -90,6 +92,7 @@ export async function update(
       categoryName: product.categoryName,
       categoryOrder: product.categoryOrder,
       unit: product.unit,
+      unitPrice: product.unitPrice,
       isActive: product.isActive,
     },
   );
